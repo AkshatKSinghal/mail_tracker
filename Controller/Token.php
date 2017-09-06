@@ -4,10 +4,18 @@ namespace Controller;
 
 class Token
 {
-	public function generate($params)
+	/**
+	 * Function to generate a new tracking token
+	 * @param int $groupId Group Id
+	 * @param string $meta JSON String
+	 * @return array Containing token and tracking link
+	 */
+	public function generate($groupId, $meta)
 	{
 		$token = new \Model\Token();
-		$tokenId = $token->generate($params);
+		$this->validateInt($groupId, 'Group ID');
+		$this->validateJson($meta, "Meta");
+		$tokenId = $token->generate($groupId, $meta);
 		return [
 			'token' => $tokenId,
 			'track_link' => $this->getTrackLink($tokenId)
@@ -21,9 +29,9 @@ class Token
 		return $host . "/token/track/" . dechex($tokenId) . "?version=$version&auth=" . $this->getAuthParameter($tokenId, $version);
 	}
 
-	public function track($token, $auth, $version)
+	public function track($tokenString, $auth, $version)
 	{
-		$tokenId = $this->validateTracker($token, $auth);
+		$tokenId = $this->validateTracker($tokenString, $auth);
 		$token = new \Model\Token($tokenId);
 		$userAgent = $_SERVER ['HTTP_USER_AGENT'];
 		$time = $_SERVER['REQUEST_TIME'];
@@ -40,7 +48,8 @@ class Token
 	public function stats($tokenId, $details = false, $pageNo = 0)
 	{
 		$token = new \Model\Token($tokenId);
-		$response = $token->stats($details, $pageNo)
+		$this->validateInt($pageNo, 'Page number');
+		$response = $token->stats($details, $pageNo);
 		$response['first_open'] = $this->formatTrackingEvents($response['first_open']);
 		$response['last_open'] = $this->formatTrackingEvents($response['last_open']);
 		if ($details) {
@@ -49,9 +58,44 @@ class Token
 		return $response;
 	}
 
-	public function summary($startTime, $bucketPeriod, $endTime, $filters, $pageNo)
+	public function groupSummary($startTime, $bucketPeriod, $endTime, $filters, $groupId, $pageNo)
 	{
+		$this->validateInt($startTime, 'Start Time', false);
+		$this->validateInt($bucketPeriod, 'Bucket period');
+		$this->validateInt($endTime, 'End Time', false);
+		$this->validateInt($groupId, 'Group Id', false);
+		$this->validateInt($pageNo, 'Page no', false);
+		$this->validateJson($meta, 'Meta Filters');
 
+		if (!in_array($bucketPeriod, [5,30])) {
+			throw new Exception("Bucket period allowed to be 5 or 30 only", 102);
+		}
+
+		$token = new \Model\Token();
+		return $token->summary($startTime, $bucketPeriod, $endTime, $filters, $groupId, $pageNo);
+	}
+
+	private function validateInt($value, $name, $allowEmpty = true)
+	{
+		if (empty($value)) {
+			if (!$allowEmpty) {
+				throw new Exception("$name cannot be empty", 102);
+			}
+		} else if (!is_numeric($value)) {
+			throw new Exception("$name invalid", 102);
+			
+		}
+	}
+
+	private function validateJson($value, $name, $allowEmpty = true)
+	{
+		if (empty($value)) {
+			if (!$allowEmpty) {
+				throw new Exception("$name cannot be empty", 102);
+			}
+		} else if (!is_array(json_decode($value, true))) {
+			throw new Exception("$name invalid", 102);
+		}
 	}
 	/**
 	 * Function to format the tracking event data from DB into required response format
