@@ -25,8 +25,9 @@ class Token
 	{
 		$tokenId = $this->validateTracker($token, $auth);
 		$token = new \Model\Token($tokenId);
-		#TODO Get time, IP, User Agent from HTTP Header
-		$time = time();
+		$userAgent = $_SERVER ['HTTP_USER_AGENT'];
+		$time = $_SERVER['REQUEST_TIME'];
+		$ip = $_SERVER['REMOTE_ADDR'];
 		try {
 			$token->track($ip, $userAgent, $time);
 		} catch (Exception $ex) {
@@ -40,9 +41,10 @@ class Token
 	{
 		$token = new \Model\Token($tokenId);
 		$response = $token->stats($details, $pageNo)
-		$response['openEventsData'] = $this->formatTrackingEvents($response['openEventsData']);
+		$response['first_open'] = $this->formatTrackingEvents($response['first_open']);
+		$response['last_open'] = $this->formatTrackingEvents($response['last_open']);
 		if ($details) {
-			$response['allOpenEventsData'] = $this->formatTrackingEvents($response['allOpenEventsData']);
+			$response['allOpenEventsData'] = array_map([self, 'formatTrackingEvents'], $response['allOpenEventsData']);
 		}
 		return $response;
 	}
@@ -58,7 +60,12 @@ class Token
 	 */
 	private function formatTrackingEvents($data)
 	{
-
+		return [
+			'time' => $data['time'],
+			'ip' => $data['ip'],
+			'user_agent' => $data['user_agent'],
+			'location' => $this->getLocation($data['ip'])
+		];
 	}
 
 	private function salt($version)

@@ -23,6 +23,16 @@ class Token
 		return mysqli_insert_id($this->db);
 	}
 
+	/**
+	 * Function to record open event of token
+	 * @param string $ip IP of client
+	 * @param string $userAgent User Agent of client
+	 * @param int $time Time of open event
+	 * 
+	 * @throws Exception In case the token is invalid/ not being tracked
+	 * 
+	 * @return void
+	 */
 	public function track($ip, $userAgent, $time)
 	{	
 		$uniqueUserString = $this->uniqueUserString($userAgent);
@@ -43,20 +53,35 @@ class Token
 	 */
 	public function stats($details, $page)
 	{
-		$query = "SELECT tokens.*, COUNT(DISTINCT tracking_event_summaries.unique_user_string) AS unique_count, SUM(tracking_event_summaries.count) AS total_count FROM tokens LEFT JOIN tracking_event_summaries ON tracking_event_summaries.token_id = tokens.id WHERE tokens.id = '$this->id' GROUP BY tokens.id;"
-		$tokenData = $this->db->query($query);
-		$openEvents = array_filter([$tokenData['first_open'], $tokenData['last_open']]);
-		$query = "SELECT * FROM tracking_events WHERE id IN (" . implode(",", $openEvents) . ")";
-		$openEventsData = $this->db->query($query);
-		$response = [
-			'tokenData' => $tokenData,
-			'openEventsData' => $openEventsData
-			];
+		$query = "SELECT tokens.id, tokens.created, tokens.meta, tokens.group_id, UNIX_TIMESTAMP(A.time) AS first_open_time, A.ip AS first_open_ip, A.user_agent AS first_open_ua, UNIX_TIMESTAMP(B.time) AS last_open_time, B.ip AS last_open_ip, B.user_agent AS last_open_ua, token_summaries.total_opens, token_summaries.unique_opens FROM tokens LEFT JOIN token_summaries ON tokens.id = token_summaries.token_id LEFT JOIN tracking_events A ON token_summaries.first_open = A.id LEFT JOIN tracking_events B ON token_summaries.last_open = B.id WHERE tokens.id = $this->id";
+		$result = $this->db->query($query);
+		if ($result->num_rows == 0) {
+			throw new Exception("Token Not Found");
+		}
+		$response = $result->fetch_assoc();
+		$response['first_open'] = [
+			'ip' => $response['first_open_ip'],
+			'time' => $response['first_open_time'],
+			'user_agent' => $response['first_open_ua']
+		];
+		unset($response['first_open_ip']);
+		unset($response['first_open_time']);
+		unset($response['first_open_ua']);
+		$response['last_open'] = [
+			'ip' => $response['last_open_ip'],
+			'time' => $response['last_open_time'],
+			'user_agent' => $response['last_open_ua']
+		];
+		unset($response['last_open_ip']);
+		unset($response['last_open_time']);
+		unset($response['last_open_ua']);
+
+		$response['page_number'] = $page;
 		if ($details) {
 			$limit = 20;
 			$offset = $page * $limit;
-			$query = "SELECT * FROM tracking_events WHERE token_id = $this->id ORDER BY time LIMIT $offset, $limit";
-			$response['allOpenEventsData'] = $this->db->query($query);
+			$query = "SELECT ip, user_agent, UNIX_TIMESTAMP(time) AS time FROM tracking_events WHERE token_id = $this->id ORDER BY time LIMIT $offset, $limit";
+			$response['open_details'] = mysqli_fetch_all($this->db->query($query));
 		}
 		return $response;
 	}
