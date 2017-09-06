@@ -44,7 +44,7 @@ class Token
 		$response['first_open'] = $this->formatTrackingEvents($response['first_open']);
 		$response['last_open'] = $this->formatTrackingEvents($response['last_open']);
 		if ($details) {
-			$response['allOpenEventsData'] = array_map([self, 'formatTrackingEvents'], $response['allOpenEventsData']);
+			$response['open_details'] = array_map([self, 'formatTrackingEvents'], $response['open_details']);
 		}
 		return $response;
 	}

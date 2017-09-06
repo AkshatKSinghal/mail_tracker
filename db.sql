@@ -28,7 +28,7 @@ CREATE TABLE `tokens` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `created` timestamp NULL DEFAULT NULL,
   `group_id` int(11) DEFAULT NULL,
-  `meta` text,
+  `meta` json,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
